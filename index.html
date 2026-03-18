@@ -369,8 +369,8 @@
                                 <td>
                                     <div class="item-list" v-if="player.Items">
                                         <div 
-                                            v-for="itemId in player.parsedItems" 
-                                            :key="itemId" 
+                                            v-for="(itemId, itemIndex) in player.parsedItems" 
+                                            :key="itemIndex" 
                                             class="item-badge"
                                         >
                                             <img :src="`data/images/items/${getIconId(itemId)}.png`" :alt="getItemName(itemId)" @error="handleImageError">
