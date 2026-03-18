@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Players Cache</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- PapaParse for CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        :root {
+            --bg-color: rgb(17, 17, 17);
+            --surface-color: rgb(33, 33, 33);
+            --primary-color: rgb(33, 150, 243);
+            --primary-hover: rgb(30, 136, 229);
+            --text-main: #ffffff;
+            --text-muted: #aaaaaa;
+            --border-color: #444444;
+            --glass-bg: rgb(33, 33, 33);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        #app {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin: 0;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            margin-bottom: 2rem;
+        }
+
+        .search-wrapper {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 1rem 1rem 1rem 3rem;
+            background-color: rgb(25, 25, 25);
+            border: 1px solid var(--border-color);
+            border-radius: 0.25rem;
+            color: var(--text-main);
+            font-size: 1rem;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .stat-chip {
+            background-color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+            color: #ffffff;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: 0.25rem;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background-color: rgb(25, 25, 25);
+            color: var(--text-main);
+            padding: 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            position: sticky;
+            top: 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+
+        th.sortable:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .sort-icon {
+            display: inline-block;
+            margin-left: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--primary-color);
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.95rem;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .item-list {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .item-badge {
+            position: relative;
+            width: 32px;
+            height: 32px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 0.25rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .item-badge:hover {
+            transform: scale(1.1);
+            border-color: rgba(255, 255, 255, 0.3);
+            z-index: 10;
+        }
+
+        .item-badge img {
+            max-width: 24px;
+            max-height: 24px;
+            object-fit: contain;
+        }
+
+        .tooltip {
+            visibility: hidden;
+            background-color: #000;
+            color: #fff;
+            text-align: center;
+            border-radius: 0.25rem;
+            padding: 0.5rem 0.75rem;
+            position: absolute;
+            z-index: 50;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            pointer-events: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border-color);
+        }
+
+        .item-badge:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .loading-state, .error-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            width: 2rem;
+            height: 2rem;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-muted);
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            margin-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover:not(:disabled) {
+            background-color: var(--primary-hover);
+        }
+
+        .btn:disabled {
+            background-color: rgba(59, 130, 246, 0.3);
+            cursor: not-allowed;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        [v-cloak] {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" v-cloak>
+        <div class="header">
+            <div>
+                <h1 class="title">Players Cache</h1>
+                <div v-if="lastUpdated" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
+                    Last updated: {{ lastUpdated }}
+                </div>
+            </div>
+            <div class="stats-bar" v-if="!loading && !error">
+                <span class="stat-chip">Total Players: {{ players.length }}</span>
+                <span class="stat-chip" v-if="searchQuery">Matching Players: {{ filteredPlayers.length }}</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="search-wrapper">
+                <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    v-model="searchQuery" 
+                    placeholder="Search by Name, Guild, Race, or Item..."
+                >
+            </div>
+
+            <div v-if="loading" class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading players data...</p>
+            </div>
+
+            <div v-else-if="error" class="error-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 1rem; color: #ef4444;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <p>{{ error }}</p>
+                <button class="btn" @click="fetchData" style="margin-top: 1rem;">Retry</button>
+            </div>
+
+            <div v-else>
+                <div v-if="filteredPlayers.length === 0" class="empty-state">
+                    No players found matching your search.
+                </div>
+                
+                <div v-else class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th @click="sortBy('Name')" class="sortable">
+                                    Name
+                                    <span v-if="sortKey === 'Name'" class="sort-icon">{{ sortAsc ? '▲' : '▼' }}</span>
+                                </th>
+                                <th @click="sortBy('Guild')" class="sortable">
+                                    Guild
+                                    <span v-if="sortKey === 'Guild'" class="sort-icon">{{ sortAsc ? '▲' : '▼' }}</span>
+                                </th>
+                                <th @click="sortBy('Race')" class="sortable">
+                                    Race
+                                    <span v-if="sortKey === 'Race'" class="sort-icon">{{ sortAsc ? '▲' : '▼' }}</span>
+                                </th>
+                                <th @click="sortBy('Total Level')" class="sortable">
+                                    Total Level
+                                    <span v-if="sortKey === 'Total Level'" class="sort-icon">{{ sortAsc ? '▲' : '▼' }}</span>
+                                </th>
+                                <th>Items</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(player, index) in paginatedPlayers" :key="index">
+                                <td><strong>{{ player.Name }}</strong></td>
+                                <td>{{ player.Guild }}</td>
+                                <td>{{ player.Race }}</td>
+                                <td>{{ player["Total Level"] }}</td>
+                                <td>
+                                    <div class="item-list" v-if="player.Items">
+                                        <div 
+                                            v-for="itemId in player.parsedItems" 
+                                            :key="itemId" 
+                                            class="item-badge"
+                                        >
+                                            <img :src="`data/images/items/${getIconId(itemId)}.png`" :alt="getItemName(itemId)" @error="handleImageError">
+                                            <span class="tooltip">{{ getItemName(itemId) }}</span>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pagination" v-if="filteredPlayers.length > 0">
+                    <span style="font-size: 0.875rem; color: var(--text-muted)">
+                        Showing {{ paginationStart + 1 }} to {{ Math.min(paginationEnd, filteredPlayers.length) }} of {{ filteredPlayers.length }} entries
+                    </span>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn" :disabled="currentPage === 1" @click="currentPage--">Previous</button>
+                        <button class="btn" :disabled="currentPage === totalPages" @click="currentPage++">Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, watch } = Vue;
+
+
+
+
+        createApp({
+            setup() {
+                const url = 'players_export_public.csv';
+                const players = ref([]);
+                const loading = ref(true);
+                const error = ref(null);
+                const searchQuery = ref('');
+                const itemNamesCache = ref({});
+                
+                // Sorting
+                const sortKey = ref('');
+                const sortAsc = ref(true);
+                
+                // Pagination
+                const currentPage = ref(1);
+                const itemsPerPage = 50;
+
+                const fetchItemNames = async () => {
+                    try {
+                        const response = await fetch('data/items.json');
+                        if (response.ok) {
+                            itemNamesCache.value = await response.json();
+                        }
+                    } catch (err) {
+                        console.error("Failed to load items.json:", err);
+                    }
+                };
+
+                const specialItemNames = {
+            3160099: "Unfinished Reverie's Diadem Halo",
+            3160151: "Unfinished Reverie's Diadem Halo (Event)",
+            1000059: "Soul Liberator", 1010070: "Soul Liberator", 1020004: "Soul Liberator",                    
+                };
+
+                const lastUpdated = ref(null);
+
+                const fetchData = async () => {
+                    loading.value = true;
+                    error.value = null;
+                    
+                    try {
+                        // First, try to get the Last-Modified header directly using fetch
+                        const response = await fetch(url, { method: 'HEAD' });
+                        if (response.ok) {
+                            const lastModifiedStr = response.headers.get('Last-Modified');
+                            if (lastModifiedStr) {
+                                const date = new Date(lastModifiedStr);
+                                lastUpdated.value = date.toLocaleString();
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Could not fetch Last-Modified header', e);
+                    }
+
+                    Papa.parse(url, {
+                        download: true,
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: function(results) {
+                            // The Go CSV writer outputs BOM, which PapaParse might handle automatically.
+                            // Ensure the headers are correct
+                            const data = results.data.filter(row => row.Name); // filter out invalid rows
+                            
+                            // Pre-parse items for faster rendering and filtering
+                            players.value = data.map(player => {
+                                const parsedItems = player.Items ? player.Items.split(';').filter(id => id.trim() !== '') : [];
+                                
+                                // Create searchable string
+                                let itemNames = parsedItems.map(id => itemNamesCache.value[id]?.name || '').join(' ');
+                                player._searchStr = `${player.Name || ''} ${player.Guild || ''} ${player.Race || ''} ${itemNames}`.toLowerCase();
+                                player.parsedItems = parsedItems;
+                                return player;
+                            });
+                            
+                            loading.value = false;
+                        },
+                        error: function(err) {
+                            console.error("Error parsing CSV:", err);
+                            error.value = "Failed to load players data. Ensure 'players_export_public.csv' exists in the same directory.";
+                            loading.value = false;
+                        }
+                    });
+                };
+
+                onMounted(async () => {
+                    await fetchItemNames();
+                    fetchData();
+                });
+
+                watch(searchQuery, () => {
+                    currentPage.value = 1; // Reset to page 1 on search
+                });
+
+                const sortBy = (key) => {
+                    if (sortKey.value === key) {
+                        sortAsc.value = !sortAsc.value;
+                    } else {
+                        sortKey.value = key;
+                        sortAsc.value = true;
+                    }
+                };
+
+                const filteredPlayers = computed(() => {
+                    const query = searchQuery.value.toLowerCase().trim();
+                    let result = players.value;
+                    
+                    if (query) {
+                        result = result.filter(player => player._searchStr.includes(query));
+                    }
+
+                    if (sortKey.value) {
+                        result = [...result].sort((a, b) => {
+                            let valA = a[sortKey.value];
+                            let valB = b[sortKey.value];
+
+                            if (sortKey.value === 'Total Level') {
+                                valA = parseInt(valA) || 0;
+                                valB = parseInt(valB) || 0;
+                            } else {
+                                valA = (valA || '').toString().toLowerCase();
+                                valB = (valB || '').toString().toLowerCase();
+                            }
+
+                            if (valA < valB) return sortAsc.value ? -1 : 1;
+                            if (valA > valB) return sortAsc.value ? 1 : -1;
+                            return 0;
+                        });
+                    }
+                    
+                    return result;
+                });
+
+                const totalPages = computed(() => {
+                    return Math.ceil(filteredPlayers.value.length / itemsPerPage) || 1;
+                });
+
+                const paginationStart = computed(() => {
+                    return (currentPage.value - 1) * itemsPerPage;
+                });
+
+                const paginationEnd = computed(() => {
+                    return paginationStart.value + itemsPerPage;
+                });
+
+                const paginatedPlayers = computed(() => {
+                    return filteredPlayers.value.slice(paginationStart.value, paginationEnd.value);
+                });
+
+                const getItemName = (id) => {
+                    return specialItemNames[id] || itemNamesCache.value[id]?.name || `Unknown Item (${id})`;
+                };
+                
+                const getIconId = (id) => {
+                    if (id == 3160151) return 3160099;
+                    return id;
+                };
+
+                const handleImageError = (e) => {
+                    // Fallback to a default icon or just set a title instead of broken image
+                    e.target.style.opacity = '0.3'; 
+                };
+
+                return {
+                    players,
+                    loading,
+                    error,
+                    searchQuery,
+                    filteredPlayers,
+                    paginatedPlayers,
+                    currentPage,
+                    totalPages,
+                    paginationStart,
+                    paginationEnd,
+                    sortKey,
+                    sortAsc,
+                    sortBy,
+                    getItemName,
+                    getIconId,
+                    handleImageError,
+                    fetchData,
+                    lastUpdated
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
